@@ -8,7 +8,9 @@ using System.Linq;
 public class AnimatedPaletteGenerator
 {
     const int AnimationCount = 3;
-    const int Stride = 3;
+    const int Stride = AnimationCount;
+    const float minSpeed = 2f;
+    const float maxSpeed = minSpeed;
 
     [MenuItem("Assets/Create/2D/Tile Palette/Animated", priority = 0)]
     private static void Generate(MenuCommand menuCommand)
@@ -38,8 +40,15 @@ public class AnimatedPaletteGenerator
 
             // Load asset, order, and filter sprites
             var data = AssetDatabase.LoadAllAssetsAtPath(srcPath);
+            data = data.OrderBy(x =>
+            {
+                if (x.name.Contains('_')) return int.Parse(x.name.Split('_')[1]);
+                return -1;
+            }
+            ).ToArray();
             var width = (data[0] as Texture2D).width;
-            data = data.Where(x => x.GetType() == typeof(Sprite)).OrderBy(x => int.Parse(x.name.Split('_')[1])).ToArray();
+
+            data = data.Where(x => x.GetType() == typeof(Sprite)).ToArray();
 
             // Make sure the  parameters are sane
             if (data == null || data.Length % AnimationCount != 0)
@@ -55,7 +64,8 @@ public class AnimatedPaletteGenerator
             {
                 animatedTile[j] = ScriptableObject.CreateInstance<AnimatedTile>();
                 animatedTile[j].m_AnimatedSprites = new Sprite[AnimationCount];
-                AssetDatabase.CreateAsset(animatedTile[j], dstPath + "/" + file + "_" + j + ".asset");
+                animatedTile[j].m_MinSpeed = minSpeed;
+                animatedTile[j].m_MaxSpeed = maxSpeed;
                 //paletteTilemap.SetTile(new Vector3Int(j % Stride, -j / Stride, 0), animatedTile[j]);
                 paletteTilemap.SetTile(new Vector3Int(j % (width / (Stride * 16)), -j / (width / (Stride * 16)), 0), animatedTile[j]);
             }
@@ -64,8 +74,14 @@ public class AnimatedPaletteGenerator
             var count = 0;
             foreach (Sprite sprite in data)
             {
-                animatedTile[count % Stride + Stride * (count / (Stride * Stride))].m_AnimatedSprites[count / Stride % Stride] = sprite;
+                var k = count % Stride + Stride * (count / (Stride * Stride));
+                animatedTile[k].m_AnimatedSprites[count / Stride % Stride] = sprite;
                 count++;
+            }
+
+            for (var j = 0; j < totalTiles; j++)
+            {
+                AssetDatabase.CreateAsset(animatedTile[j], dstPath + "/" + file + "_" + j + ".asset");
             }
 
             // Print results
